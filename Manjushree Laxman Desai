@@ -1,0 +1,85 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_absolute_error
+
+# 1. Create sample sales data
+np.random.seed(42)
+
+dates = pd.date_range("2023-01-01", periods=36, freq="MS")
+sales = 12000 + np.arange(36) * 350 + np.random.normal(0, 900, 36)
+
+df = pd.DataFrame({
+    "Month": dates,
+    "Sales": sales.round(2),
+    "Orders": np.random.randint(180, 420, 36)
+})
+
+# 2. Explore the data
+print("First five rows:")
+print(df.head())
+
+print("\nTotal Sales:", round(df["Sales"].sum(), 2))
+print("Average Monthly Sales:", round(df["Sales"].mean(), 2))
+
+# 3. Visualize monthly sales
+plt.figure(figsize=(10, 5))
+plt.plot(df["Month"], df["Sales"], marker="o")
+plt.title("Monthly Retail Sales")
+plt.xlabel("Month")
+plt.ylabel("Sales")
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.savefig("monthly_sales.png")
+plt.show()
+
+# 4. Prepare data for forecasting
+df["Month_Index"] = np.arange(len(df))
+
+X = df[["Month_Index"]]
+y = df["Sales"]
+
+# Use the first 30 months for training
+X_train = X.iloc[:30]
+y_train = y.iloc[:30]
+
+# Use the last 6 months for testing
+X_test = X.iloc[30:]
+y_test = y.iloc[30:]
+
+# 5. Train the model
+model = LinearRegression()
+model.fit(X_train, y_train)
+
+# 6. Predict sales for the test period
+predictions = model.predict(X_test)
+
+print("\nActual Sales:")
+print(y_test.to_list())
+
+print("\nPredicted Sales:")
+print(predictions.round(2))
+
+mae = mean_absolute_error(y_test, predictions)
+print("\nMean Absolute Error:", round(mae, 2))
+
+# 7. Forecast the next 3 months
+future_months = pd.DataFrame({
+    "Month_Index": [36, 37, 38]
+})
+
+future_sales = model.predict(future_months)
+
+forecast = pd.DataFrame({
+    "Month": pd.date_range("2026-01-01", periods=3, freq="MS"),
+    "Forecast_Sales": future_sales.round(2)
+})
+print("\nNext 3 Months Sales Forecast:")
+print(forecast)
+
+# 8. Save the results
+df.to_csv("retail_sales_data.csv", index=False)
+forecast.to_csv("sales_forecast.csv", index=False)
+
+print("\nProject completed successfully!")

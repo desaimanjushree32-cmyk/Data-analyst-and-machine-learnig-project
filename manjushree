@@ -1,0 +1,135 @@
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, classification_report
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.pipeline import Pipeline
+
+# 1. Create sample customer data
+np.random.seed(42)
+
+n = 1000
+
+tenure = np.random.randint(1, 73, n)
+charges = np.random.uniform(20, 120, n).round(2)
+support_calls = np.random.poisson(2, n)
+
+contract = np.random.choice(
+    ["Monthly", "One Year", "Two Year"],
+    n,
+    p=[0.55, 0.25, 0.20]
+)
+
+# Generate sample churn outcomes
+logit = (
+    -1.2
+    + 0.035 * (charges - 70)
+    - 0.025 * (tenure - 24)
+    + 0.55 * support_calls
+    + 1.0 * (contract == "Monthly")
+    - 0.6 * (contract == "Two Year")
+)
+
+probability = 1 / (1 + np.exp(-logit))
+churn = np.random.binomial(1, probability)
+
+df = pd.DataFrame({
+    "Tenure": tenure,
+    "Monthly_Charges": charges,
+    "Support_Calls": support_calls,
+    "Contract": contract,
+    "Churn": churn
+})
+
+# 2. Explore the data
+print("First five rows:")
+print(df.head())
+
+print("\nDataset information:")
+print(df.info())
+
+print("\nChurn rate (%):")
+print(round(df["Churn"].mean() * 100, 2))
+
+# 3. Analyze churn by contract
+print("\nChurn by Contract:")
+print(df.groupby("Contract")["Churn"].mean().mul(100).round(2))
+
+sns.barplot(data=df, x="Contract", y="Churn", errorbar=None)
+plt.title("Customer Churn by Contract")
+plt.ylabel("Churn Rate")
+plt.tight_layout()
+plt.savefig("churn_by_contract.png")
+plt.show()
+
+# 4. Prepare features and target
+X = df[
+    ["Tenure", "Monthly_Charges", "Support_Calls", "Contract"]
+]
+y = df["Churn"]
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X,
+    y,
+    test_size=0.2,
+    random_state=42,
+    stratify=y
+)
+
+# 5. Prepare numerical and categorical columns
+preprocessor = ColumnTransformer([
+    (
+        "numeric",
+        StandardScaler(),
+        ["Tenure", "Monthly_Charges", "Support_Calls"]
+    ),
+    (
+        "category",
+        OneHotEncoder(handle_unknown="ignore"),
+        ["Contract"]
+    )
+])
+
+# 6. Build and train the model
+model = Pipeline([
+    ("preprocessor", preprocessor),
+    ("classifier", LogisticRegression(max_iter=1000))
+])
+
+model.fit(X_train, y_train)
+
+# 7. Evaluate the model
+predictions = model.predict(X_test)
+
+print("\nModel Accuracy:")
+print(round(accuracy_score(y_test, predictions), 3))
+
+print("\nClassification Report:")
+print(classification_report(y_test, predictions, zero_division=0))
+
+# 8. Predict for a new customer
+new_customer = pd.DataFrame([{
+    "Tenure": 5,
+    "Monthly_Charges": 95.0,
+    "Support_Calls": 4,
+    "Contract": "Monthly"
+}])
+
+prediction = model.predict(new_customer)[0]
+churn_probability = model.predict_proba(new_customer)[0][1]
+
+print("\nNew Customer Prediction:")
+print("Likely to leave" if prediction == 1 else "Likely to stay")
+print("Estimated churn probability:",
+      round(churn_probability * 100, 2), "%")
+
+# 9. Save the dataset
+df.to_csv("customer_churn_data.csv", index=False)
+
+print("\nProject completed successfully!")
